@@ -1,0 +1,81 @@
+metaxploit = include_lib("/lib/metaxploit.so")
+if not metaxploit then metaxploit = include_lib(home_dir + "/metaxploit.so")
+if not metaxploit then exit("Error: Missing metaxploit library")
+
+sh = get_shell
+pc = sh.host_computer
+
+lib_dir = pc.File("/lib")
+libs = lib_dir.get_files
+
+lib_dict = {}
+for lib in libs
+    lib_dict[lib.name] = lib
+end for
+
+print "Select a lib:"
+cnt = 0
+lib_indexes = lib_dict.indexes
+for i in lib_dict.indexes
+    cnt = cnt + 1
+	print "  "+cnt+". "+"<color=white>"+i+"</color>"
+end for
+while true
+	n = user_input("Enter a number: ")
+	n = n.val-1
+	if lib_indexes.hasIndex(n) then
+		
+		metalib = metaxploit.load(lib_dir.path+"/"+lib_indexes[n])
+        scan_result = metaxploit.scan(metalib)
+        keyword_dict = {}
+		n = 0
+        for addr in scan_result
+            probe_result = metaxploit.scan_address(metalib,scan_result[n])
+			n = n + 1
+            keyword_dict[addr] = probe_result.split("\n")[2:]
+            t_list = keyword_dict[addr]
+            keyword_dict[addr] = []
+            for k in t_list
+                if k == "" then continue
+                if k[0] == "U" then 
+                    k = k.split("<b>")[1].split("</b>")[0]
+                    keyword_dict[addr].push(k)
+                end if
+            end for
+        end for
+        objects = []
+        for addr in keyword_dict.indexes
+            for key in keyword_dict[addr]
+                objects.push(metalib.overflow(addr,key))
+            end for
+        end for
+        ls = objects
+        objects = []
+        for obj in ls
+            if obj != null then
+                objects.push(obj)
+            end if
+		end for
+        print objects // 需要鉴权
+        k = user_input("Continue or Select another lib?\n[c]:")
+        if k == "c" then break
+        continue
+	end if
+end while
+cnt = 0
+for obj in objects
+    cnt = cnt + 1
+    print cnt+". "+obj
+end for
+while true
+    k = user_input("Enter a number: ")
+    k = k.val-1
+    if not objects.hasIndex(k) then continue
+    break
+end while
+obj = objects[k]
+if typeof(obj) == "shell" then
+    obj.start_terminal
+else if typeof(obj) == "computer" then
+    pass
+end if

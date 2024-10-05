@@ -1,0 +1,166 @@
+// subject: Micro Editor
+// version: 0.1
+// @description A simple text editor used in the game Grey Hack.
+//        		Inspired by rocketorbit/rocShell, nano, pico, ed and other editors.
+// @param  [opt] {String} filename or path to file
+// @return null
+// @author robo_head
+
+pass = @yield
+
+file = {}
+file.name = ""
+file.path = ""
+file.name_temp = ""
+file._init = function(self)
+    if params.len > 1 then exit("Too many arguments.")
+    if params.len > 0 then 
+        t = params[0].split("/")
+        self.path = params[0]-("/"+t[-1])
+        self.name = t[-1]
+    else
+        self.path = current_path
+        self.name = "temp"
+    end if
+    self.name_temp = self.name + ".swp"
+    self.path_with_filename = self.path + "/" + self.name_temp
+end function
+
+
+controller = {}
+controller.shell = get_shell
+controller._init = function(self,file)
+    self.computer = self.shell.host_computer
+    self.folder = self.computer.File(file.path)
+    self.files = self.folder.get_files
+end function
+controller.varify_swap_exists = function(self,fn)
+    for f in self.files
+        if f == fn then return true
+    end for
+    return false
+end function
+
+
+char_sets = {}
+char_sets.enter = char(10)
+char_sets.vertical_bar = "|"
+char_sets.blank = " "
+
+
+swap = {}
+swap.source_text = ""
+swap.rows_dict = {}
+swap.row_num = {"v":0}
+swap.exists = false
+swap.modified = false
+swap.source_file = null
+swap._init = function(self,controller,file)
+    if controller.varify_swap_exists(file.name_temp) then
+        self.exists = true
+    else
+        if not controller.computer.touch(file.path, file.name_temp) then exit("Fail to create file.")
+    end if
+    self.source_file = controller.computer.File(file.path_with_filename)
+    self.source_text = self.source_file.get_content
+	if self.source_text != "" then 
+        rows = self.source_text.split("\n")
+        for i in range(1,rows.len)
+            self.rows_dict[i] = rows[i-1]
+        end for
+    end if
+    self.row_num.v = self.rows_dict.len
+end function
+swap.row_num.bump_plus = function
+    self.v = self.v + 1
+    return self.v
+end function
+swap.write = function(self)
+    txt = ""
+    for i in range(1,self.row_num.v)
+        txt = txt + self.rows_dict[i] + char(10)
+    end for
+    self.source_file.set_content(txt)
+end function
+
+
+interface = {}
+interface.text = ""
+interface.swp = null
+interface._init = function(self, swap)
+    self.swp = swap
+end function
+interface.show = function(swap)
+    print(self.text, true)
+end function
+interface.draw = function(self)
+    self.text = "NAVI_BAR: · \n"
+    if self.swp.row_num.v > 0 then
+        for i in range(1, self.swp.row_num.v)
+            self.text = self.text + self.swp.rows_dict[i] + "\n"
+        end for
+    end if
+end function
+interface.update = function(self)
+    self.draw
+end function
+
+
+main = function
+    file._init
+    controller._init(file)
+    swap._init(controller,file)
+    interface._init(swap)
+    
+    while true
+		interface.update
+        interface.show
+        input_text =  user_input(":")
+        if input_text == "" then 
+            continue
+        else if input_text == ":c" then
+            // TODO  Command Mode
+            // [+] 1. need write and quit commands
+            // [+] 2. need a new prompt sign
+            // [+] 3. should be single key input
+            // [+] 4. A input loop
+            while true
+                interface.show
+                k = user_input("$",false,true)
+                if k == "" then 
+                    continue
+                else if k == "w" then
+                    swap.write
+                    swap.modified = false
+                else if k == "q" then
+                    if swap.modified then
+                        user_input "<color=red>No write since last change.</color>"
+                        continue
+                    else
+                        exit
+                    end if
+                else if k == "x" then
+                    swap.write
+                    exit
+                end if
+            end while
+
+            pass    // not sure do something here
+            
+        else if input_text == ":q" then
+            if swap.modified then
+                user_input "<color=red>No write since last change.</color>"
+                continue
+            else
+                exit
+            end if
+        else if input_text == ":w" then
+            swap.write
+            swap.modified = false
+        else
+            swap.rows_dict[swap.row_num.bump_plus] = input_text // 多重语义
+            swap.modified = true
+        end if
+    end while
+end function
+main

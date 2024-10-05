@@ -1,0 +1,147 @@
+// subject: Micro Editor
+// version: 0.2
+// @description A simple text editor used in the game Grey Hack.
+//        		Inspired by rocketorbit/rocShell, nano, pico, ed and other editors.
+// @param  [opt] {String} filename or path to file
+// @return null
+// @depressed
+// @author robo_head
+
+pass = @yield
+
+fp = ""
+fn = ""
+
+if params.len > 1 then exit("Too many arguments.")
+if params.len > 0 then 
+	t = params[0].split("/")
+	fp = params[0]-("/"+t[-1])
+	fn = t[-1]
+else
+	fp = current_path
+	fn = "tmp"
+end if
+fnt = fn + ".swp"
+
+string.ins = function(ls)
+	for i in ls 
+		if i == self then return true
+	end for
+	return false
+end function
+
+list.get_names = function
+	tmp = []
+	for i in self
+		if typeof(i) == "file" then tmp.push(i.name)
+	end for
+	return tmp
+end function
+
+shell = get_shell
+host = shell.host_computer
+file = null
+floder = host.File(fp)
+enter = char(10)
+vertical_bar = "|"
+blank = " "
+tot = ""
+src = ""
+cnt = 0
+ptr = cnt
+swp_exits = false
+
+active_line = 0
+line_color = function(n)
+	if n == active_line then
+		return "<b><color=green>"+n+"</color></b>"
+	end if
+	return "<b><color=orange>"+n+"</color></b>"
+end function
+
+color_tag = function(t,c)
+	return "<color=" + c + ">" + t + "</color>"
+end function
+
+modify_number_color = function(act)
+	globals.tot = globals.tot.replace("<color=orange>"+act, "<color=yellow>"+act)
+end function
+
+repaire_number_color = function(n)
+	globals.tot = globals.tot.replace("<color=yellow>"+n, "<color=orange>"+n)
+end function
+
+if fnt.ins(floder.get_files.get_names) then
+	r = user_input("A history record detected.\nLoad it?[y/n]: ")
+	if r != "y" then exit("Bye.")
+	swp_exits = true
+else
+	success = host.touch(fp,fnt)
+	if not success then exit("Fail to create file.")
+end if
+file = host.File(fp+"/"+fnt)
+src = file.get_content
+if src then
+	ls = src.split(enter)
+	for i in range(0,ls.len-1)
+		cnt = cnt + 1
+		s = line_color(cnt) + "<color=white>" + vertical_bar + blank + ls[i]+ "</color>" + enter
+		tot = tot + s
+	end for
+end if
+
+if not swp_exits then
+// show title and introductions
+	msg = "<b>Micro Editor</b> v0.1"+"\nHelping children in poor mountainous areas of China"
+	msg = msg + "enter <b>c</b> to change input mode"
+	print(msg, true)
+end if
+
+
+// mian loop
+while true
+	print(tot,true)
+	msg = user_input("<b><color=yellow>:</color></b>",false)
+	ptr = cnt
+	cnt = cnt + 1
+	if msg == "c" then
+		cnt = cnt-1
+		ptr = cnt
+		k = user_input("<b><color=yellow>$</color></b>",false,true)
+		if k == "Escape" then
+			file.set_content(src)
+			exit "Bye."
+		else if k.ins(["x","X"]) then
+			file.set_content(src)
+			if fn == "tmp" then fn = user_input(color_tag("Enter file name: ","white"))
+			file.rename(fn)
+			exit "Bye."
+		else if k.lower == "d" then
+			pass
+		else if k.ins(["s","S"]) then
+			// enter seek mode
+			while true
+				modify_number_color(ptr)
+				for i in range(1,cnt)
+					if i != ptr then repaire_number_color(i)
+				end for
+				print(tot,true)
+				k = user_input("<b><color=orange>$</color></b>",false,true)
+				if k == "Escape" then 
+					exit "Bye."
+				else if k == "k" or k == "UpArrow" then
+					if ptr > 1 then	ptr = ptr-1
+				else if k == "j" or k == "DownArrow" then
+					if ptr < cnt then ptr = ptr+1
+				end if
+			end while
+		end if
+	end if
+	if cnt > ptr then
+		s = line_color(cnt) + color_tag(vertical_bar + blank + msg, "white")
+		s = s + enter
+		tot = tot + s
+		src = src + msg + enter
+	end if
+end while
+

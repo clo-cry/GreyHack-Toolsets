@@ -1,0 +1,689 @@
+pass = @yield
+// builtin extends
+list.has_elem = function(e)
+	for i in self
+		if i == e then
+			return true
+		end if
+	end for
+	return false
+end function
+
+metaxplot_path = "/lib/metaxploit.so"
+metaxploit = include_lib(metaxplot_path)
+if not metaxploit then metaxploit = include_lib(current_path + metaxplot_path[5:])
+if not metaxploit then exit("Error: Missing metaxploit library")
+
+crypto_path = "/lib/crypto.so"
+crypto = include_lib(crypto_path)
+if not crypto then crypto = include_lib(current_path + crypto_path[5:])
+if not crypto then user_input("<color=orange>Warning: crypto.so is missing, continue?")
+
+print "\n" + "==" * 15
+target = ""
+target_lan = ""
+if params.len > 0 and is_valid_ip(params[0]) then target = params[0]
+if params.len > 1 and is_valid_ip(params[1]) then target_lan = params[1]
+
+STATE = ""
+if params.len > 2 then
+	STATE = "router"
+else
+	STATE = "service"
+end if
+
+if STATE == "router" then
+	router = get_router(target)
+	bssid = router.bssid_name
+	essid = router.essid_name
+	lan_ip = router.devices_lan_ip
+	firewall = router.firewall_rules
+	k_ver = router.kernel_version
+	l_ip = router.local_ip
+	p_ip = router.public_ip
+	ports = router.used_ports
+end if
+
+kmp_matching = function(t, p, pnext)
+	j = 0
+	i = 0
+	n = t.len
+	m = p.len
+	while j < n and i < m
+		if i == -1 or t[j] == p[i] then
+			j = j + 1
+			i = i + 1
+		else
+			i = pnext[i]
+		end if
+	end while
+	if i == m then return j - i
+	return -1
+end function
+
+gen_pnext = function(p)
+	i = 0
+	k = -1
+	m = len(p)
+	pnext = [ -1 ] * m
+	while i < m - 1
+		if k == -1 or p[i] == p[k] then
+			i = i + 1
+			k = k + 1
+			if p[i] == p[k] then
+				pnext[i] = pnext[k]
+			else
+				pnext[i] = k
+			end if
+		else
+			k = pnext[k]
+		end if
+	end while
+	return pnext
+end function
+
+// utils
+
+ip_select = function(port)
+	if port == 0 then
+		ip = target_lan
+	else
+		ip = target
+	end if
+	return ip
+end function
+
+port_select = function
+	if STATE == "service" then
+		port = params[1].to_int
+	else if params.len == 3 then
+		port = params[2].to_int
+	else
+		port = 0
+	end if
+	return port
+end function
+
+if STATE == "router" then
+	print "<color=green>BSSID: " + bssid
+	print "<color=green>ESSID: " + essid
+	print "Public IP: " + p_ip
+	print "Local IP: " + l_ip
+	print "<color=orange>LAN_ip: " + lan_ip
+	print "防火墙规则: " + firewall
+	print "<b>kernel_router.so</b> 版本" + ": " + k_ver
+
+	info = "LAN STATE SERVICE VERSION PORT"
+	for port in ports
+		port_state = "open"
+		if port.is_closed then port_state = "closed"
+		info = info + "\n" + port.get_lan_ip + " " + port_state + " " + router.port_info(port) + " " + port.port_number
+	end for
+	print format_columns(info) + "\n"
+
+	info = "KEY VALUE"
+	msg = whois(target)
+	items = msg.split("\n")
+	for item in items
+		arr = item.split(": ")
+		arr0 = arr[0].split(" ")
+		arr1 = arr[1].split(" ")
+		arr[0] = arr0.join("_")
+		arr[1] = arr1.join("_")
+		info = info + "\n" + arr[0] + " " + arr[1]
+	end for
+	print format_columns(info) + "\n"
+end if
+
+port = port_select
+// ip = ip_select(port)
+ip = target
+print "hack on " + "ip <b>" + ip + " </b>and port " + "<b>" + port + "</b>..."
+
+session = metaxploit.net_use(ip, port)
+
+if typeof(session) != "NetSession" then exit("Can't establish session.")
+print "设备连接数: " + session.get_num_conn_gateway
+print "开放端口数: " + session.get_num_portforward
+print "注册用户数: " + session.get_num_users
+print "用户在线: " + session.is_any_active_user
+print "管理员在线: " + session.is_root_active_user
+
+metalib = session.dump_lib
+scan_result = metaxploit.scan(metalib)
+print scan_result
+
+objects_gained = []
+
+pattern = "<b>"
+pn = gen_pnext(pattern)
+for addr in scan_result
+	msg = metaxploit.scan_address(metalib, addr)
+	keywords = []
+	texts = msg.split("\n")
+	for text in texts
+		ind = kmp_matching(text, pattern, pn)
+		if ind == -1 then continue
+		part = text[ind + 3 : ].split("\.")[0].split("<")[0]
+		keywords.push part
+	end for
+	for key in keywords
+		objects_gained.push metalib.overflow(addr, key, target_lan)
+	end for
+end for
+
+print objects_gained
+
+// Authentication
+OBJ_TABLE = {}
+OBJ_TABLE.shell = {}
+OBJ_TABLE.computer = {}
+OBJ_TABLE.file = {}
+for obj in objects_gained
+	tp = typeof(obj)
+	if tp == "shell" then
+		pc = obj.host_computer
+		mayuri = pc.File("/home/guest/Dudulu.tok")		// need to retouch
+		if mayuri then 
+			mayuri.delete
+		end if
+		ok = pc.touch("/home/guest","Dudulu.tok")
+		if ok == 1 then
+			mayuri = pc.File("/home/guest/Dudulu.tok")
+		else
+			exit "Error: guest folder can't access."
+		end if
+		OBJ_TABLE.shell[mayuri.owner] = obj
+	else if tp == "computer" then
+		christina = obj.File("/home/guest/Christina.tok")
+		if christina then
+			christina.delete
+		end if
+		ok = obj.touch("/home/guest","Christina.tok")
+		if ok == 1 then
+			christina = obj.File("/home/guest/Christina.tok")
+		else
+			exit "Error: guest folder can't access."
+		end if
+		OBJ_TABLE.computer[christina.owner] = obj
+	else if tp == "file" then
+		f = obj
+		if f.set_owner("guest") == "" then
+			OBJ_TABLE.file.root = obj
+		else
+			p = f.parent
+			while p.parent
+				p = p.parent
+			end while
+			if p.name == "/" then
+				for i in p.get_folders
+					if i.name == "home" then p = i
+				end for
+				for i in p.get_folders
+					if i.name == "guest" then continue
+					if i.has_permission("r") and i.has_permission("w") and i.has_permission("x") then
+						OBJ_TABLE.file[i.name] = obj
+					end if
+				end for
+				if not OBJ_TABLE.file.hasIndex(i.name) then OBJ_TABLE.file.guest = obj
+			else
+				OBJ_TABLE.file.guest = obj
+			end if
+		end if
+	end if
+end for
+
+cmd = {}
+cmd.has_cmd = function(key)
+	for na in self.indexes
+		if key == na then return true
+	end for
+	return false
+end function
+cmd.mail = function(pc=null,user,path,path_f,args)
+	par = pc.File("/home")
+	if par.is_folder then
+		folders = par.get_folders
+		for folder in folders
+			user = folder.name
+			if user == "guest" then continue
+			f = pc.File("/home/" + user + "/Config/Mail.txt")
+			msg = ""
+			if f != null then msg = f.get_content
+			if args.len > 0 and args[0] == "-d" then
+				l = msg.split(":")
+				if l then
+					print l[0]+ " : " + crypto.decipher(l[1])
+				end if
+			else
+				print f.get_content
+			end if
+		end for
+		break
+	end if
+	return 0
+end function
+cmd.credential = function(pc=null,user,path,path_f,args)
+	f = pc.File("/etc/passwd")
+	if not f then
+		print "Error: Can't find /etc/passwd"
+	else
+		if not f.has_permission("r") then
+			print "Permission denied."
+		else
+			txt = f.get_content.split("\n")[:-1]
+			if txt.len != 0 then 
+				for i in txt
+					kv = i.split(":")
+					print kv[0] + " : " + crypto.decipher(kv[1])
+				end for
+			end if
+		end if
+	end if
+	return 0
+end function
+cmd.nmap = function(pc=null,user,path,path_f,args,sh=null)
+	pass
+end function
+cmd.cmd = function(pc=null,user,path,path_f,args,sh=null)
+	if sh then sh.start_terminal
+	return 0
+end function
+cmd.exit = function(pc=null,user,path,path_f,args,sh=null)
+	return -1
+end function
+cmd.cat = function(pc=null,user,path,path_f,args,sh=null)
+	fn = args[0]
+	fp_words = fn.split("/")
+	c_fl = path_f.get_files
+	sub_files_names = []
+	for f in c_fl
+		sub_files_names.push(f.name)
+	end for
+	if fp_words.len == 1 and sub_files_names.has_elem(fp_words[0]) then
+		fp = path + "/" + fp_words[0]
+	else
+		fp = fn
+	end if
+	file = pc.File(fp)
+	if file == null then
+		print "File not exits."
+	else if file.is_binary then
+		print "Can't open binary file."
+	else if not file.has_permission("r") then
+		print "Permission denied."
+	else
+		print "<color=white>" + file.get_content + "</color>"
+	end if
+	return 0
+end function
+cmd.pwd = function(pc=null,user,path,path_f,args,sh=null)
+	print path
+	return 0
+end function
+cmd.cd = function(pc=null,user,path,path_f,args,sh=null)
+	ans = ""
+	dn = args[0]
+	if dn == ".." then
+		ans = parent_path(path)
+	else
+		fl = path_f.get_folders
+		_is_sub_path = false
+		for i in fl
+			if i.name == dn then
+				_is_sub_path = true
+				break
+			end if
+		end for
+		if _is_sub_path then
+			ans = path + "/" + dn
+		else
+			ans = dn
+		end if
+	end if
+	if pc.File(ans) == null then
+		print "Path not exits."
+		ans = path
+	end if
+	return ans
+end function
+cmd.rm = function(pc=null,user,path,path_f,args,sh=null)
+	file = path+"/"+args[0]
+	ans = pc.File(file).delete
+	if ans != "" then print ans
+	return 0
+end function
+cmd.ls = function(pc=null,user,path,path_f,args,sh=null)
+	if args.len == 0 then
+		folders = path_f.get_folders
+		print 
+		files = path_f.get_files
+		msg = ""
+		for folder in folders
+			msg = msg + "<color=#0bf><u>" + folder.name + "</u> </color>"
+		end for
+		msg = msg + "\n"
+		for file in files
+			msg = msg + "<color=white>" + file.name + " </color>"
+		end for
+		print msg
+	else
+		pass
+	end if
+	return 0
+end function
+cmd.md = function(pc=null,user,path,path_f,args,sh=null)
+	if args.len != 1 or args[0] == "-h" or args[0] == "--help" then
+		print(command_info("mkdir_usage"))
+	else
+		fp = args[0]
+		pp = parent_path(fp)
+		fe = pc.File(fp)
+		if fp == pp then pp = path
+		parent = pc.File(pp)
+		if parent == null then 
+			print "md: <b>" + pp + "</b> not found"
+		else if fe != null then
+			print "md: <b>" + fe.path + "</b> file exits"
+		else if not parent.has_permission("w") then
+			print "md: permission denied"
+		else
+			path_list = fp.split("/")
+			res = pc.create_folder(parent.path,path_list[-1])
+			if res != null and res != 1 then
+				print res
+			end if
+		end if
+	end if
+	return 0
+end function
+cmd.mv = function(pc=null,user,path,path_f,args,sh=null)
+	if args.len != 2 then 
+		print(command_info("mv_ussage"))
+	else
+		orig_file = args[0]
+		dest_folder = args[1]
+		file = pc.File(orig_file)
+		if pc.File(orig_file) == null then 
+			print("mv: can't find file <b>"+orig_file+"</b>")
+		else
+			fd = pc.File(dest_folder)
+			fn = ""
+			if fd == null then
+				parent_folder = parent_path(dest_folder)
+				if parent_folder == dest_folder then
+					fn = dest_folder
+					dest_folder = file.parent.path
+					file.move(dest_folder,fn)
+				else
+					fd = pc.File(parent_folder)
+					fn = dest_folder[dest_folder.len-(dest_folder.len-parent_folder.len):]
+					if fn[0] == "/" then fn = fn[1:]
+					if fd == null then print("mv: can't copy file. <b>"+dest_folder+"</b> doesn't exits.")
+				end if
+			end if
+			if fd != null then
+				if file.parent.path != fd.parent.path or file.name != fd.name then
+					final_dest = fd.path
+					if fn.len == 0 then fn = file.name
+					if not fd.is_folder then 
+						final_dest = fd.parent.path
+						fn = fd.name
+					end if
+					if file.parent.path == fd.parent.path and fn != file.name then
+						file.rename(fn)
+					else
+						file.move(final_dest, fn)
+					end if
+				end if
+			end if
+		end if
+	end if
+	return 0
+end function
+cmd.useradd = function(pc=null,user,path,path_f,args,sh=null)
+	res = pc.create_user(args[0],args[1])
+	if res != 1 then print res
+	return 0
+end function
+
+root = {"obtained":false,"shell":null,"computer":null,"file":null}
+guest = {"obtained":false,"shell":null,"computer":null,"file":null}
+users = {}
+
+obj_shell_indices = OBJ_TABLE.shell.indexes
+for i in obj_shell_indices
+	obj = OBJ_TABLE.shell[i]
+	if i == "root" and obj != null then
+		root.obtained = true
+		root.shell = obj
+	else if i == "guest" and obj then
+		guest.obtained = true
+		guest.shell = obj
+	else
+		users[i] = {"shell":obj}
+	end if	
+end for
+obj_computer_indices = OBJ_TABLE.computer.indexes
+for i in obj_computer_indices
+	obj = OBJ_TABLE.computer[i]
+	if i == "root" and obj then
+		root.obtained = true
+		root.computer = obj
+	else if i == "guest" and obj then
+		guest.obtained = true
+		guest.computer = obj
+	else
+		users[i] = {"computer":obj}
+	end if
+end for
+obj_file_indices = OBJ_TABLE.file.indexes
+for i in obj_file_indices
+	obj = OBJ_TABLE.file[i]
+	if i == "root" and obj then
+		root.obtained = true
+		root.file = obj
+	else if i == "guest" and obj then 
+		guest.obtained = true
+		guest.file = obj
+	else
+		users[i] = {"file":obj}
+	end if
+end for
+
+mainloop = function(obj,name)
+	if typeof(obj) == "computer" then
+		user_name = name
+		pc_name = obj.get_name
+		if user_name == "root" then
+			home == obj.File("/root")
+		else
+			home = obj.File("/home/"+user_name)
+		end if
+		l1 = "\n<color=#0dd>|--(</color>"+"<color=#0bf>"+user_name+char(169)+pc_name
+		l3 = "\n<color=#0dd>|--</color><color=#0bf>$</color> "
+		c_path = home.path
+		path_file = obj.File(c_path)
+		while true
+			p = c_path
+			if c_path == home.path then p = "~"
+			l2 = "<color=#0dd>)-[</color><color=white>"+p+"</color><color=#0dd>]</color>"
+			key = user_input(l1+l2+l3)
+			key_list = key.split(" ")
+			command = key_list[0]
+			args = key_list[1:]
+			if not cmd.has_cmd(command) then continue
+			fn = cmd[command]; res = fn(obj,user_name,c_path,path_file,args)
+			if res == -1 then break
+			if res != 0 then c_path = res
+			path_file = obj.File(c_path)
+
+			pass
+
+		end while
+		break
+	else if typeof(obj) == "shell" then
+		user_name = name
+		pc = obj.host_computer
+		pc_name = pc.get_name
+		if user_name == "root" then
+			home = pc.File("/root")
+		else
+			home = pc.File("/home/"+user_name)
+		end if
+		l1 = "\n<color=#0dd>|--(</color>"+"<color=#0bf>"+user_name+char(169)+pc_name
+		l3 = "\n<color=#0dd>|--</color><color=#0bf>$</color> "
+		c_path = home.path
+		path_file = pc.File(c_path)
+		while true
+			p = c_path
+			if c_path == home.path then p = "~"
+			l2 = "<color=#0dd>)-[</color><color=white>"+p+"</color><color=#0dd>]</color>"
+			key = user_input(l1+l2+l3)
+			key_list = key.split(" ")
+			command = key_list[0]
+			args = key_list[1:]
+			if not cmd.has_cmd(command) then continue
+			fn = cmd[command]; res = fn(pc,user_name,c_path,path_file,args,obj)
+			if res == -1 then break
+			if res != 0 then c_path = res
+			path_file = pc.File(c_path)
+
+			pass
+
+		end while
+		break
+	else if typeof(obj) == "file" then
+		user_name = name
+		pc_name = "FILE_MODE"
+		l1 = "\n<color=#0dd>|--(</color>"+"<color=#0bf>"+user_name+char(169)+pc_name
+		l3 = "\n<color=#0dd>|--</color><color=#0bf>$</color> "
+		c_dic = obj
+		print "<color=orange>WARNING: You have entered FILE mode."
+		print "<color=orange> * one dictionary per move</color>"
+		print "<color=orange> * only <b>cat, mv, ls</b> avalibale</color>"
+
+		while true
+			p = c_dic.path
+			l2 = "<color=#0dd>)-[</color><color=white>"+p+"</color><color=#0dd>]</color>"
+			key = user_input(l1+l2+l3)
+			key_list = key.split(" ")
+			command = key_list[0]
+			args = key_list[1:]
+			if command == "cd" then
+				if args.len == 1 then
+					if args[0] == ".." and c_dic.parent != null then
+						c_dic = c_dic.parent
+					else
+						for d in c_dic.get_folders
+							if d.name == args[0] then 
+								c_dic = d
+								break
+							end if
+						end for
+					end if
+				end if	
+			else if command == "ls" then
+				folders = c_dic.get_folders
+				print
+				files = c_dic.get_files
+				msg = ""
+				for folder in folders
+					msg = msg + "<color=#0bf><u>" + folder.name + "</u> </color>"
+				end for
+				msg = msg + "\n"
+				for file in files
+					msg = msg + "<color=white>" + file.name + " </color>"
+				end for
+				print msg
+			else if command == "cat" then
+				fl = c_dic.get_files
+				for i in fl
+					if i.name == args[0] then
+						if not i.has_permission("r") then
+							print "permission denied"
+						else
+							print i.get_content
+						end if
+					end if
+				end for
+			else if command == "group" then
+				print c_dic.group
+			end if
+		end while
+	else
+		pass
+	end if
+end function
+
+if root.obtained then 
+	print "<b><color=green>root</color></b> <color=white>obtained.</color>"
+	if root.shell then print "<color=white> * shell</color>"
+	if root.computer then print "<color=white> * computer</color>"
+	if root.file then print "<color=white> * file</color>"
+	object = null
+	while true
+		k = user_input("Select an object: ")
+		if k == "shell" and root.shell then 
+			object = root.shell
+			mainloop(object,"root")
+		else if k == "computer" and root.computer then
+			object = root.computer
+			mainloop(object,"root")
+		else if k == "file" and root.file then
+			object = root.file
+			mainloop(object,"root")
+		else if k == "n" then
+			break
+		end if
+	end while
+end if
+if users.len > 0 then
+	p = "-+"
+	print "<b><color=orange>user</color></b> <color=white>obtained.</color>"
+	for i in users.indexes
+		print "<color=white>* " + i + "</color>"
+		print " <color=white>[" + p[users[i].hasIndex("shell")] + "] shell</color>" 
+		print " <color=white>[" + p[users[i].hasIndex("computer")] + "] computer</color>" 
+		print " <color=white>[" + p[users[i].hasIndex("file")] + "] file</color>" 
+	end for
+	object = null
+	while true
+		k = user_input("Select user and object: ")
+		if k == "n" then break
+		ks = k.split(" ")
+		if ks.len != 2 then 
+			print "Invaild Format: piease using <b>user object<b>"
+			continue
+		end if
+		if users.hasIndex(ks[0]) then
+			if users[ks[0]].hasIndex(ks[1]) then
+				object = users[ks[0]][ks[1]]
+				mainloop(object,ks[0])
+			end if
+		end if
+	end while
+end if
+if guest.obtained then
+	p = "-+"
+	object = null
+	while true
+		print "<b><color=#0bf>guest</color></b> <color=white>obtained.</color>"
+		if guest.shell then print "<color=white> * shell</color>"
+		if guest.computer then print "<color=white> * computer</color>"
+		if guest.file then print "<color=white> * file</color>"	
+		k = user_input("Select an object: ")
+		if k == "shell" and guest.shell then 
+			object = guest.shell
+			mainloop(object,"guest")
+		else if k == "computer" and guest.computer then
+			object = guest.computer
+			mainloop(object,"guest")
+		else if k == "file" and guest.file then
+			object = guest.file
+			mainloop(object,"guest")
+		else if k == "n" then 
+			break
+		end if
+	end while
+end if

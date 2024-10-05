@@ -1,0 +1,7 @@
+puts = @print
+
+p = function(s)
+    if typeof(s) == "string" then
+        print """" + s + """"
+    end if
+end function

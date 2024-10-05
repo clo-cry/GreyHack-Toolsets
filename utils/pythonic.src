@@ -1,0 +1,25 @@
+
+// data structures
+tuple = {"classID":"tuple"}
+
+set = {"classID":"set"}
+
+dict = new map
+dict.classID = "dict"
+
+map.get = function(key,default)
+    if map.hasIndex(key) then map.key = default
+    return map.key
+end function
+
+
+// builtin functions
+map = function(proc, iterable_obj)
+    res = []
+    for obj in iterable_obj
+        res.push(proc(obj))
+    end for
+    return res
+end function
+
+input = @user_input

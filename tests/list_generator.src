@@ -1,0 +1,17 @@
+list_generator = function(t)
+    i = -1
+    n = t.len
+    fn = function()
+        outer.i = i + 1
+        if i < n then return t[i]
+    end function
+    return @fn
+end function
+
+t = [10,20,30]
+iter = list_generator(t)
+while true
+    e = iter()
+    if e == null then break
+    print e
+end while
