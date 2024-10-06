@@ -3,7 +3,7 @@ pass = @yield
 globals.sh = get_shell
 globals.pc = get_shell.host_computer
 globals.NAME = "alias"
-globals.paths = ["/bin","/usr/bin"]
+globals.paths = ["/bin","/usr/bin",home_dir]
 
 // meta functions
 SHOW_USSAGES = function
@@ -15,15 +15,6 @@ SHOW_USSAGES = function
     u_6 = char(9) + char(9) + "<b>list</b> : show alias settings\n\n"
     print u_1+u_2+u_3+u_4+u_5+u_6
 end function
-
-if params.len < 1 then 
-    SHOW_USSAGES;exit 
-end if
-for i in params
-    if i == "-h" or i == "--help" or i == "?" then
-        SHOW_USSAGES;exit
-    end if
-end for
 
 // from pythonic.src
 map = function(proc, iterable_obj)
@@ -60,9 +51,10 @@ cfg.print = function
     print self.text
 end function
 cfg.varify = function
-    l0 = map(get_file_name, pc.File(paths[0]))
-    l1 = map(get_file_name, pc.File(paths[1]))
-    cmds = l0+l1
+    l0 = map(@get_file_name, pc.File(paths[0]).get_files)
+    l1 = map(@get_file_name, pc.File(paths[1]).get_files)
+    l2 = map(@get_file_name, pc.File(paths[2]).get_files)
+    cmds = l0+l1+l2
     command_exists_1 = false
     command_exists_2 = false
     lines = self.text.split("\n")
@@ -90,11 +82,45 @@ end function
 
 
 builder = {}
+builder.generate_src = function(cmd_path)
+    src = "get_shell.launch(" + cmd_path + ",params.join(" "))" 
+    pc.touch
+end function
+builder.build = function(alias_name)
+    
+end function
 
 parser = {}
+parser.init = function
+    if params.len != 1 then 
+        SHOW_USSAGES;exit 
+    end if
+    for i in params
+        if i == "-h" or i == "--help" or i == "?" then
+            SHOW_USSAGES;exit
+        end if
+    end for
+    kv = params[0].split("=")
+    if kv.len != 2 then 
+        if params[0] == "list" then
+            cfg.print
+        end if
+        exit "error alias format.\n example: alias py=python"
+    end if
+    alias = kv[0]
+    cmd = kv[1]
+    l1 = map(@get_file_name, pc.File(paths[0]).get_files)
+    l2 = map(@get_file_name, pc.File(paths[1]).get_files)
+    l3 = map(@get_file_name, pc.File(paths[3]).get_files)
+    clis = l1 + l2 + l3
+    for i in clis
+        if i != cmd then exit  i + " not found"
+    end for
+    
+end function
 
 main = function
     cfg.setup
-
+    parser.init
 end function
 main
