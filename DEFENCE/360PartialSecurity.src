@@ -1,9 +1,28 @@
+// macros
+pass = @yield
+void = null
+
+// global settings
 globals.shell = get_shell
 globals.computer = shell.host_computer
 globals.root = computer.File("/")
+globals.NAME = "360PartialSecurity"
+
+// meta functions
+SELF_DIAGNOSIS = function
+    pass
+end function
+
 // alter permissions on local machine
-home_permission_sercurity = function
+home_permission_sercurity = function(void)
     if not root then return -1
     root.chmod("o-rwx",true)
     return 0
+end function
+
+// main function
+main = function(void)
+
+    pass
+
 end function

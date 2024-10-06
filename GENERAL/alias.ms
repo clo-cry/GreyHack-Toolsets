@@ -1,0 +1,100 @@
+pass = @yield
+
+globals.sh = get_shell
+globals.pc = get_shell.host_computer
+globals.NAME = "alias"
+globals.paths = ["/bin","/usr/bin"]
+
+// meta functions
+SHOW_USSAGES = function
+    u_1 = "\n<b>Name</b>\n" + char(9) + "alias\n\n"
+    u_2 = "<b>Gramma</b>\n" + char(9) + "alias [opt:-g] <string>=<string>\n" + char(9) + "alias list\n\n"
+    u_3 = "<b>Examples</b>\n" + char(9) + "alias -g cls=clear\n" + char(9) + "alias py=python\n\n"
+    u_4 = "<b>Explain</b>\n" + char(9) + "alias used to define a short name for terminal commands.\n\n"
+    u_5 = char(9) + char(9) + "<b>-g</b> : set global alias. It will be set for current user if ignore it.\n\n"
+    u_6 = char(9) + char(9) + "<b>list</b> : show alias settings\n\n"
+    print u_1+u_2+u_3+u_4+u_5+u_6
+end function
+
+if params.len < 1 then 
+    SHOW_USSAGES;exit 
+end if
+for i in params
+    if i == "-h" or i == "--help" or i == "?" then
+        SHOW_USSAGES;exit
+    end if
+end for
+
+// from pythonic.src
+map = function(proc, iterable_obj)
+    res = []
+    for obj in iterable_obj
+        res.push(proc(obj))
+    end for
+    return res
+end function
+
+get_file_name = function(file)
+    return file.name
+end function
+
+
+cfg = {}
+cfg.name = ".aliasrc"
+cfg.path = home_dir
+cfg.text = ""
+cfg.load = function
+    f = pc.File(self.path+"/"+self.name)
+    if not f then 
+        ok = pc.touch(self.path,self.name)
+        if ok != 1 then
+            print ok
+            return -1
+        end if
+        f = pc.File(self.path+"/"+self.name)
+    end if
+    self.text = f.get_content
+    return 0
+end function
+cfg.print = function
+    print self.text
+end function
+cfg.varify = function
+    l0 = map(get_file_name, pc.File(paths[0]))
+    l1 = map(get_file_name, pc.File(paths[1]))
+    cmds = l0+l1
+    command_exists_1 = false
+    command_exists_2 = false
+    lines = self.text.split("\n")
+    if lines.len != 0 then
+        for l in lines
+            kv = l.split("=")
+            if kv.len != 2 then continue
+            for i in cmds
+                if kv[0] == i then command_exists_1 = true
+                if kv[1] == i then command_exists_2 = true
+            end for
+            if not command_exists_1 then return -1
+            if not command_exists_2 then return -1
+        end for
+    end if
+    return 0
+end function
+cfg.save = function(cmd)
+    pass
+end function
+cfg.setup = function
+    if self.load then exit "can't get file .aliasrc"
+    if self.varify then exit "command not found"
+end function
+
+
+builder = {}
+
+parser = {}
+
+main = function
+    cfg.setup
+
+end function
+main
