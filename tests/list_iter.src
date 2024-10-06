@@ -1,9 +1,0 @@
-// 迭代器
-list_iterator = function(f)
-    l = range(0,100)
-    for i in l
-        f(i)
-    end for
-end function
-
-list_iterator(@print)
