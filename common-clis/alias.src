@@ -39,7 +39,7 @@ end function
 
 
 cfg = {}
-cfg.name = "aliasrc"
+cfg.name = ".aliasrc"
 cfg.path = home_dir
 cfg.text = ""
 cfg._load = function
