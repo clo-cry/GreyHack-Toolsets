@@ -1,3 +1,11 @@
+// alias.src
+// @description general alias-cli, create alias for any existed application
+// @version 0.1
+// TODO list
+//      [] alias list
+//      [+] alias <string>=<string>
+//      [] alias -g <string>=<string>   
+
 pass = @yield
 
 globals.sh = get_shell
@@ -9,7 +17,7 @@ globals.paths = ["/bin","/usr/bin",home_dir]
 SHOW_USSAGES = function
     u_1 = "\n<b>Name</b>\n" + char(9) + "alias\n\n"
     u_2 = "<b>Gramma</b>\n" + char(9) + "alias [opt:-g] <string>=<string>\n" + char(9) + "alias list\n\n"
-    u_3 = "<b>Examples</b>\n" + char(9) + "alias -g cls=clear\n" + char(9) + "alias py=python\n\n"
+    u_3 = "<b>Examples</b>\n" + char(9) + "alias -g py=python\n" + char(9) + "alias p=ping\n\n"
     u_4 = "<b>Explain</b>\n" + char(9) + "alias used to define a short name for terminal commands.\n\n"
     u_5 = char(9) + char(9) + "<b>-g</b> : set global alias. It will be set for current user if ignore it.\n\n"
     u_6 = char(9) + char(9) + "<b>list</b> : show alias settings\n\n"
@@ -24,17 +32,17 @@ map = function(proc, iterable_obj)
     end for
     return res
 end function
-
+// temporary functions
 get_file_name = function(file)
     return file.name
 end function
 
 
 cfg = {}
-cfg.name = ".aliasrc"
+cfg.name = "aliasrc"
 cfg.path = home_dir
 cfg.text = ""
-cfg.load = function
+cfg._load = function
     f = pc.File(self.path+"/"+self.name)
     if not f then 
         ok = pc.touch(self.path,self.name)
@@ -44,13 +52,19 @@ cfg.load = function
         end if
         f = pc.File(self.path+"/"+self.name)
     end if
+    self.file = f
     self.text = f.get_content
+    if self.text != "" then
+        self.lines = self.text.split("\n")
+    else
+        self.lines = []
+    end if
     return 0
 end function
 cfg.print = function
     print self.text
 end function
-cfg.varify = function
+cfg._varify = function
     l0 = map(@get_file_name, pc.File(paths[0]).get_files)
     l1 = map(@get_file_name, pc.File(paths[1]).get_files)
     l2 = map(@get_file_name, pc.File(paths[2]).get_files)
@@ -72,25 +86,39 @@ cfg.varify = function
     end if
     return 0
 end function
-cfg.save = function(cmd)
-    pass
+// save alias to .aliasrc
+cfg.save = function(name,cmd)
+    record = name + "=" + cmd
+    record_existed = false
+    for i in self.lines
+        if i == record then record_existed = true
+    end for
+    if not record_existed then
+        self.lines.push(record)
+        self.file.set_content(self.lines.join(char(10)))
+    end if
 end function
 cfg.setup = function
-    if self.load then exit "can't get file .aliasrc"
-    if self.varify then exit "command not found"
+    if self._load then exit "can't get file .aliasrc"
+    if self._varify then exit "command not found"
 end function
 
 
 builder = {}
-builder.generate_src = function(cmd_path)
-    src = "get_shell.launch(" + cmd_path + ",params.join(" "))" 
-    pc.touch
+builder.generate_src = function(alias_path,alias_name,cmd_path,cmd_name)
+    self.fpath = alias_path
+    src = "get_shell.launch(""" + cmd_path + """,params.join("" ""))" 
+    pc.touch(self.fpath,alias_name+".src")
+    self.file = pc.File(self.fpath+"/"+alias_name+".src")
+    self.file.set_content(src)
 end function
-builder.build = function(alias_name)
-    
+builder.build = function(alias_path,alias_name,cmd_path,cmd_name)
+    self.generate_src(alias_path,alias_name,cmd_path,cmd_name)
+    sh.build(self.file.path, alias_path)
+    self.file.delete
 end function
 
-parser = {}
+parser = {}     // TODO: -g 
 parser.init = function
     if params.len != 1 then 
         SHOW_USSAGES;exit 
@@ -105,18 +133,24 @@ parser.init = function
         if params[0] == "list" then
             cfg.print
         end if
-        exit "error alias format.\n example: alias py=python"
+        exit "error alias format.\n example: alias p=ping"
     end if
     alias = kv[0]
     cmd = kv[1]
-    l1 = map(@get_file_name, pc.File(paths[0]).get_files)
-    l2 = map(@get_file_name, pc.File(paths[1]).get_files)
-    l3 = map(@get_file_name, pc.File(paths[3]).get_files)
+    l1 = pc.File(paths[0]).get_files
+    l2 = pc.File(paths[1]).get_files
+    l3 = pc.File(paths[2]).get_files
     clis = l1 + l2 + l3
     for i in clis
-        if i != cmd then exit  i + " not found"
+        n = i.name
+        p = i.path
+        if n == cmd then 
+            cfg.save(alias,cmd)
+            builder.build(paths[0],alias,p,cmd)
+            return
+        end if
     end for
-    
+    exit  cmd + " not found"
 end function
 
 main = function

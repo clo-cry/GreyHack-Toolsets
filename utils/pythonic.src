@@ -1,3 +1,6 @@
+pass = @yield
+input = @user_input
+raise = @exit
 
 // data structures
 tuple = {"classID":"tuple"}
@@ -7,14 +10,22 @@ set = {"classID":"set"}
 dict = new map
 dict.classID = "dict"
 
+
+// builtin functions
 map.get = function(key,default)
     if map.hasIndex(key) then map.key = default
     return map.key
 end function
 
+dict.get = function(key,default)
+    if map.hasIndex(key) then map.key = default
+    return map.key
+end function
 
-// builtin functions
+
+// functional programing
 map = function(proc, iterable_obj)
+    if not iterable_obj isa list then raise "TypeError: not iterable"
     res = []
     for obj in iterable_obj
         res.push(proc(obj))
@@ -22,4 +33,13 @@ map = function(proc, iterable_obj)
     return res
 end function
 
-input = @user_input
+reduce = function(proc, iterable_obj)
+    if not iterable_obj isa list then raise "TypeError: not iterable"
+    res = iterable_obj[0]
+    for i in range(1,iterable_obj.len-1)
+        res = proc(res,iterable_obj[i])
+    end for
+    return res
+end function
+
+
