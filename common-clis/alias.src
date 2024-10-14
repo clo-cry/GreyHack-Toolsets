@@ -68,7 +68,7 @@ cfg.print = function
         print self.text
     end if
 end function
-cfg._varify = function
+cfg._verify = function
     l0 = map(@get_file_name, pc.File(paths[0]).get_files)
     l1 = map(@get_file_name, pc.File(paths[1]).get_files)
     cmds = l0+l1
@@ -103,7 +103,7 @@ cfg.save = function(name,cmd)
 end function
 cfg.setup = function
     if self._load then exit "can't get file .aliasrc"
-    if self._varify then exit "command not found"
+    if self._verify then exit "command not found"
 end function
 
 

@@ -1,0 +1,14 @@
+pass = @yield
+
+globals.sh = get_shell
+
+
+utils = {}
+utils.generate_ip = function
+    
+end function
+
+target = {}
+target.init = function
+    
+end function

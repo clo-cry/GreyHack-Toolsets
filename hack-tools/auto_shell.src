@@ -1,0 +1,7 @@
+pass = @yield
+
+globals.sh = get_shell
+globals.shr = null
+globals.shc = sh
+
+

@@ -1,0 +1,159 @@
+pass = @yield
+
+globals.sh = get_shell
+globals.pc = sh.host_computer
+globals.PATH = home_dir+"/.cache"
+
+block = {}
+block.cache = pc.File(PATH)
+block.init = function
+    if typeof(self.cache) != "file" then
+        ok = pc.create_folder(home_dir,".cache")
+        if not ok then exit "Error: Permission Denied"
+        self.cache = pc.File(PATH)
+    end if
+end function
+// check if is single statement
+block.check = function(msg)
+    li = msg.split("\s+")
+    if li[0] == "for" then
+        parser.head = "for"
+        return -1
+    else if li[0] == "while" then
+        parser.head = "while"
+        return -1
+    else
+        for i in li
+            if i == "function" then 
+                parser.head = "function"
+                return -1
+            end if
+        end for
+    end if
+    return 0
+end function
+block.build = function(dic)
+    f = pc.File(PATH+"/b.src")
+    if not f then
+        pc.touch(PATH,"b.src")
+        f = pc.File(PATH+"/b.src")
+    end if
+    if dic.len == 1 then            
+        return
+    else
+        content = ""
+        for i in single.vars
+            content = content + i.key + "=" + i.value + char(10)
+        end for
+        f.set_content(content+dic.join(char(10)))
+    end if
+    sh.build(PATH+"/b.src",PATH)
+    sh.launch(PATH+"/b")
+    parser.list = []
+end function
+
+single = {}
+single.vars = {}
+single.calc = function(exp) // exp:str
+    if pc.File(PATH+"/a.src") == null then
+        pc.touch(PATH,"a.src")
+    end if
+    f = pc.File(PATH+"/a.src")
+    pairs = exp.split("\s*=\s*")
+    if pairs.len == 2 then
+        self.vars[pairs[0]] = pairs[1]
+        return 0
+    end if
+    msg = ""
+    for i in self.vars
+        msg = msg + i.key + "=" + i.value + char(10)
+    end for
+    for i in self.vars.indexes
+        if i == exp then
+            msg = msg + i + "=" + self.vars[i] + char(10) + "print " + exp
+            f.set_content(msg)
+            sh.build(PATH+"/a.src",PATH)
+            sh.launch(PATH+"/a")
+            return 0
+        end if
+    end for
+    if exp.is_match("print") then
+        msg = msg + exp
+    else
+        msg = msg + "print " + exp
+    end if
+    f.set_content(msg)
+    sh.build(PATH+"/a.src",PATH)
+    sh.launch(PATH+"/a")
+    return 0
+end function
+
+parser = {}
+parser.list = []
+parser.prompt = "> "
+parser.ongoing = false
+parser.head = ""
+parser.init = function
+    print "GreyScript"
+    print "Command-Line (EllipseOS) v0.1; language v0.8.5 (Oct 9 2012)"
+end function
+parser.update = function
+    msg = user_input(self.prompt)
+    if msg == "" then return
+    ct = block.check(msg)
+    if ct or self.head != "" then 
+        self.prompt = ">>> "
+        self.ongoing = true
+        self.list.push(msg)
+    else
+        self.prompt = "> "
+        self.ongoing = false
+    end if
+    if msg == "end for" then
+        if self.head == "for" then
+            self.prompt = "> "
+            self.head = ""
+            self.ongoing = false
+            block.build(self.list)
+            
+            self.list = []
+            return
+        end if
+    else if msg == "end while" then
+        if self.head == "while" then
+            self.prompt = "> "
+            self.head = ""
+            self.ongoing = false
+            block.build(self.list)
+            self.list = []
+            return
+        end if
+    else if msg == "end function" then
+        if self.head == "function" then
+            self.prompt = "> "
+            self.head = ""
+            self.ongoing = false
+            block.build(self.list)
+            self.list = []
+            return
+        end if
+    end if
+    if not self.ongoing and self.head == "" then
+        ok = single.calc(msg)
+        if ok then
+            pass
+        else
+            return
+        end if
+    end if
+end function
+
+main = {}
+main.start = function
+    block.init
+    parser.init
+    while true
+        parser.update
+    end while
+end function
+main.start
