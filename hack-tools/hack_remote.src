@@ -234,6 +234,9 @@ for obj in objects_gained
 end for
 
 cmd = {}
+cmd.help = function()	// 命令列表
+	pass 					
+end function
 cmd.has_cmd = function(key)
 	for na in self.indexes
 		if key == na then return true
@@ -259,7 +262,7 @@ cmd.mail = function(pc=null,user,path,path_f,args)
 				print f.get_content
 			end if
 		end for
-		break
+
 	end if
 	return 0
 end function
@@ -374,7 +377,7 @@ cmd.ls = function(pc=null,user,path,path_f,args,sh=null)
 end function
 cmd.md = function(pc=null,user,path,path_f,args,sh=null)
 	if args.len != 1 or args[0] == "-h" or args[0] == "--help" then
-		print(command_info("mkdir_usage"))
+		print(command_info("mkdir_ussage"))
 	else
 		fp = args[0]
 		pp = parent_path(fp)
@@ -521,7 +524,7 @@ mainloop = function(obj,name)
 			pass
 
 		end while
-		break
+		
 	else if typeof(obj) == "shell" then
 		user_name = name
 		pc = obj.host_computer
@@ -543,7 +546,7 @@ mainloop = function(obj,name)
 			key_list = key.split(" ")
 			command = key_list[0]
 			args = key_list[1:]
-			if not cmd.has_cmd(command) then continue
+			if not cmd.has_cmd(command) then continue   // 可以重构
 			fn = cmd[command]; res = fn(pc,user_name,c_path,path_file,args,obj)
 			if res == -1 then break
 			if res != 0 then c_path = res
@@ -552,7 +555,7 @@ mainloop = function(obj,name)
 			pass
 
 		end while
-		break
+		
 	else if typeof(obj) == "file" then
 		user_name = name
 		pc_name = "FILE_MODE"

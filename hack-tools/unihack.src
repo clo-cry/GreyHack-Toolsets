@@ -1,0 +1,221 @@
+pass = @yield
+// builtin extends
+list.has_elem = function(e, opt = false)
+	if opt then
+		for i in self
+			if i.name == e then return i
+		end for
+		return null
+	end if
+	for i in self
+		if i == e then
+			return true
+		end if
+	end for
+	return false
+end function
+
+// Initialization
+Lib = {}
+Lib.required = [ "aptclient.so" ]
+Lib.necessary = [
+	"metaxploit.so",
+	"crypto.so",
+]
+Lib.libs = {}	// use a map to store the lib resources.
+Lib.init = function
+	self.load_required
+end function
+Lib.load_required = function
+	for i in Lib.required
+		res = include_lib("/lib/" + i)
+		if res == null then
+			print("<!> Missing " + i)
+		else
+			self.libs[str(res)] = res
+		end if
+	end for
+	for i in Lib.necessary
+		res = include_lib("/lib/" + i)
+		if res == null then
+			print("<color=red><!> Error: Missing " + i)
+		else
+			self.libs[str(res)] = res
+		end if
+	end for
+end function
+
+
+// UI Manager
+Interface = {}
+Interface.input = ""
+Interface.init = function
+	self.shell = get_shell
+	self.pc = self.shell.host_computer
+	self.username = active_user
+	self.hostname = self.pc.get_name
+	self.current_dir = self.pc.File(current_path)
+	self.home = home_dir
+end function
+
+Interface.path_display = function
+	if self.current_dir.path[0:self.home.len] == self.home then
+		return "~"+self.current_dir.path[self.home.len:self.current_dir.path.len]
+	else
+		return self.current_dir.path
+	end if
+end function
+
+Interface.is_root = function
+	if self.username == "root" then
+		return true
+	else
+		return false
+	end if
+end function
+
+Interface.prompt = function
+	s = ""
+	if not self.is_root then
+		s = "<color=#0dd>|--(</color><color=#0bf>" + self.username + char(169) + self.hostname + "</color>"
+		s = s + "<color=#0dd>)-[</color><color=white>" + self.path_display + "</color><color=#0dd>]</color>"
+		print s
+		s = "<color=#0dd>|-</color><color=#0bf>$</color> "
+	else
+		s = "<color=#0bf>|--(</color><color=red>root" + char(169) + self.hostname + "</color>"
+		s = s + "<color=#0bf>)-[</color><color=white>" + self.path_display + "</color><color=#0bf>]</color>"
+		print s
+		s = "<color=#0bf>|-</color><color=red>#</color> "
+	end if
+	self.input = user_input(s)
+end function
+
+
+Command = {
+	"rhost": "127.0.0.1",
+	"libs": [],
+}
+Command.lst = [
+	"help",
+	"mv",
+	"cp",
+	"ls",
+	"cd",
+	"pwd",
+	"probe",
+	"set",
+	"run",
+]
+Command.help = function(args)
+	print "UNIHACK v0.0.1 ## alpha stage"
+	print "-" * 20
+	for i in self.lst
+		print i
+	end for
+end function
+
+Command.pwd = function(args)
+	print
+	print Interface.current_dir.path
+end function
+
+Command.cd = function(args)
+	if args.len > 1 then
+		print "<!> too many arguments."; return
+	end if
+	floders = args[0].split("\\")
+	sub_floders = Interface.current_dir.get_folders
+	// TODO: 根据 floders 的长度决定条件
+	if floders.len == 1 then
+		if floders[0] == ".." then
+			p = Interface.current_dir.parent
+			if p then 
+				if floders.len == 1 then
+					Interface.current_dir = p; return
+				end if
+			else
+				print "<!> Parent path didn't exist."
+			end if
+		end if
+		res = sub_floders.has_elem(floders[0],true)
+		if res then
+			Interface.current_dir = res; return
+		end if
+		print "<!> Can't find directory "+floders[0]
+	end if
+	if floders[0] == "." then
+		d = Interface.current_dir
+		pass // TODO 
+	end if
+
+end function
+
+Command.ls = function(args)
+	folders = Interface.current_dir.get_folders
+	print 
+	files = Interface.current_dir.get_files
+	msg = ""
+	for folder in folders
+		msg = msg + "<color=#0bf><u>" + folder.name + "</u> </color>"
+	end for
+	msg = msg + "\n"
+	for file in files
+		msg = msg + "<color=white>" + file.name + " </color>"
+	end for
+	print msg
+end function
+
+Command.probe = function(args)
+	router = get_router(self.rhost)
+	for port in router.used_ports	// could be refacted
+		self.libs.push(Lib.libs["MetaxploitLib"].net_use(self.rhost,port.port_number).dump_lib)
+	end for
+	cnt = 0
+	for lib in self.libs
+		print cnt+char(9)+lib.lib_name+char(9)+lib.version
+		cnt = cnt + 1
+	end for
+end function
+
+Command.set = function(args)
+	if args[0] == "rhost" then
+		if is_valid_ip(args[1]) then
+			self.rhost = args[1]
+			print "Added IP address "+args[1]; return
+		end if
+		print "<!> Invaild IP Address."
+	end if
+end function
+
+Command.run = function(args)
+	
+end function
+
+Command.exec = function
+	tmp = Interface.input.split(" ")
+	cmd = tmp[0]
+	args = tmp[1 : tmp.len]
+	if not cmd then
+		print
+	else
+		if self.lst.has_elem(cmd) then
+			self[cmd] args
+		else
+			print "<color=yellow><!> Not found such command.</color>"
+		end if
+	end if
+
+end function
+
+Mainloop = {}
+Mainloop.start = function
+	print
+	Lib.init
+	Interface.init
+	while true
+		Interface.prompt
+		Command.exec
+		print
+	end while
+end function
+Mainloop.start

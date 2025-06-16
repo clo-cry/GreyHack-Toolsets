@@ -1,3 +1,6 @@
+// TODO
+// [] function support
+// [] global scope
 pass = @yield
 
 globals.sh = get_shell
@@ -33,6 +36,7 @@ block.check = function(msg)
     return 0
 end function
 block.build = function(dic)
+    // need to pass custom object
     f = pc.File(PATH+"/b.src")
     if not f then
         pc.touch(PATH,"b.src")
@@ -53,7 +57,7 @@ block.build = function(dic)
 end function
 
 single = {}
-single.vars = {}
+single.vars = {}    // varibles
 single.calc = function(exp) // exp:str
     if pc.File(PATH+"/a.src") == null then
         pc.touch(PATH,"a.src")
@@ -89,7 +93,7 @@ single.calc = function(exp) // exp:str
 end function
 
 parser = {}
-parser.list = []
+parser.list = []    // statements
 parser.prompt = "> "
 parser.ongoing = false
 parser.head = ""
@@ -115,7 +119,7 @@ parser.update = function
             self.head = ""
             self.ongoing = false
             block.build(self.list)
-            
+
             self.list = []
             return
         end if

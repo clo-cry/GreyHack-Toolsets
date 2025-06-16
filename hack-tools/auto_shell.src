@@ -1,7 +1,54 @@
 pass = @yield
 
-globals.sh = get_shell
-globals.shr = null
-globals.shc = sh
+
+libs = {}
+libs.metaxploit = include_lib("/lib/metaxploit.so")
+libs.crypto = include_lib("/lib/crypto.so")
+libs.init = function
+    if not self.metaxploit then
+        lib = include_lib(current_path+"/metaxploit.so")
+        if not lib then exit "<b>metaxploit.so</b> mismatch"
+        self.metaxploit = lib
+    end if
+    if not self.crypto then
+        lib = include_lib(current_path+"/crypto.so")
+        if not lib then exit "<b>crypto.so</b> mismatch"
+        self.crypto = lib
+    end if
+end function
 
 
+shell = {}
+shell.local = get_shell
+shell.remote = null
+shell.current = self.local
+shell.init = function
+    if not shell.local then exit "permission denied"
+    pass
+end function
+
+
+parser = {}
+parser.init = function
+    
+end function
+parser.check = function(msg)
+    li = msg.split("\s+")
+
+end function
+parser.update = function
+    
+end function
+
+
+// main loop
+main = {}
+main.launch = function
+    libs.init
+    shell.init
+    parser.init
+    while true
+        parser.update
+    end while
+end function
+main.launch

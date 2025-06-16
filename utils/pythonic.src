@@ -2,6 +2,14 @@ pass = @yield
 input = @user_input
 raise = @exit
 
+
+// builtin extention
+map.get = function(key,default)
+    if map.hasIndex(key) then map.key = default
+    return map.key
+end function
+
+
 // data structures
 tuple = {"classID":"tuple"}
 
@@ -11,19 +19,7 @@ dict = new map
 dict.classID = "dict"
 
 
-// builtin functions
-map.get = function(key,default)
-    if map.hasIndex(key) then map.key = default
-    return map.key
-end function
-
-dict.get = function(key,default)
-    if map.hasIndex(key) then map.key = default
-    return map.key
-end function
-
-
-// functional programing
+// functional tools
 map = function(proc, iterable_obj)
     if not iterable_obj isa list then raise "TypeError: not iterable"
     res = []
@@ -42,4 +38,6 @@ reduce = function(proc, iterable_obj)
     return res
 end function
 
-
+filter = function(proc, iterable_obj)
+    pass
+end function
